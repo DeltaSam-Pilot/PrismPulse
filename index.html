@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>PrismPulse — Image Effects, Frame Gen & Shader Manager</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <svg class="brand-logo" width="34" height="34" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="prismGrad" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#22d3ee" />
+                <stop offset="100%" stop-color="#3b82f6" />
+              </linearGradient>
+            </defs>
+            <rect x="2" y="2" width="60" height="60" rx="14" fill="#111520" stroke="url(#prismGrad)" stroke-width="2.5"/>
+            <polygon points="32,12 50,22 50,42 32,52 14,42 14,22" stroke="url(#prismGrad)" stroke-width="2.5" fill="rgba(34,211,238,0.08)"/>
+            <polygon points="32,20 42,26 42,38 32,44 22,38 22,26" stroke="#38bdf8" stroke-width="2" fill="none"/>
+            <line x1="32" y1="12" x2="42" y2="26" stroke="url(#prismGrad)" stroke-width="1.8"/>
+            <line x1="50" y1="22" x2="42" y2="38" stroke="url(#prismGrad)" stroke-width="1.8"/>
+            <line x1="50" y1="42" x2="32" y2="44" stroke="url(#prismGrad)" stroke-width="1.8"/>
+            <line x1="32" y1="52" x2="22" y2="38" stroke="url(#prismGrad)" stroke-width="1.8"/>
+            <line x1="14" y1="42" x2="22" y2="26" stroke="url(#prismGrad)" stroke-width="1.8"/>
+            <line x1="14" y1="22" x2="32" y2="20" stroke="url(#prismGrad)" stroke-width="1.8"/>
+          </svg>
+          <div>
+            <h2>PRISMPULSE</h2>
+            <span class="brand-tag">FUSION GRAPHICS ENGINE</span>
+          </div>
+        </div>
+
+        <nav class="nav-links">
+          <button class="nav-btn active" data-tab="setup">Per-Game Setup</button>
+          <button class="nav-btn" data-tab="components">Components & MFG</button>
+          <button class="nav-btn" data-tab="lookeditor">Look Editor & Presets</button>
+          <button class="nav-btn" data-tab="diagnostics">Diagnostics & Verify</button>
+        </nav>
+
+        <div class="status-box">
+          <small>Fusion Runtime</small>
+          <p class="status-ok">● SHA-256 Verified (v1.0)</p>
+          <span class="sub" style="font-size:11px;">Snapshot-before-inject active</span>
+        </div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <h1 id="page-title">Per-Game Setup</h1>
+            <span class="sub" id="active-path-label">Scanning Steam & MS Store simulators...</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <select id="sim-selector" class="sim-select" style="display:none;"></select>
+            <button id="autodetect-btn" class="primary-btn">Auto-Detect Sim</button>
+            <button id="open-folder-btn" class="secondary-btn">Open Folder</button>
+            <button id="find-folder-btn" class="secondary-btn">Browse</button>
+          </div>
+        </header>
+
+        <section id="view-container"></section>
+      </main>
+    </div>
+    <script type="module" src="/src/renderer.ts"></script>
+  </body>
+</html>
