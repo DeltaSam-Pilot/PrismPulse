@@ -4,11 +4,15 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -40,3 +44,21 @@ jobs:
           name: PrismPulseApp-win32-x64
           path: out/PrismPulseApp-win32-x64
           if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = Get-ChildItem -Path "out\make" -Recurse -File |
+            Where-Object { $_.Extension -in ".exe", ".zip", ".nupkg" }
+
+          if ($assets.Count -eq 0) {
+            throw "No release assets found under out\make"
+          }
+
+          gh release create "${{ github.ref_name }}" @($assets.FullName) `
+            --repo "${{ github.repository }}" `
+            --title "PrismPulse ${{ github.ref_name }}" `
+            --generate-notes
