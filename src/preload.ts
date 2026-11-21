@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 export interface SimDirectoryInfo {
   name: string;
   path: string;
-  isInstalled: boolean;
+  hasProfile: boolean;
   hasUserCfg: boolean;
   hasAntiCheat: boolean;
   savedPresets: string[];
@@ -42,6 +42,7 @@ export interface LoadedPresetResult {
   success: boolean;
   message: string;
   look?: LookSettings;
+  components?: Partial<ComponentSettings>;
 }
 
 export interface DiagnosticsReport {
@@ -49,12 +50,15 @@ export interface DiagnosticsReport {
   ram: string;
   gpu: string;
   simRunning: boolean;
+  integrityStatus: string;
   manifestInfo: string;
 }
 
 contextBridge.exposeInMainWorld('prismpulse', {
   autoDetectAllSims: (): Promise<SimDirectoryInfo[]> =>
     ipcRenderer.invoke('auto-detect-all-sims'),
+  inspectTargetFolder: (folderPath: string): Promise<SimDirectoryInfo | null> =>
+    ipcRenderer.invoke('inspect-target-folder', folderPath),
   selectTargetFolder: (): Promise<SimDirectoryInfo | null> =>
     ipcRenderer.invoke('select-target-folder'),
   openTargetFolder: (folderPath: string): Promise<void> =>

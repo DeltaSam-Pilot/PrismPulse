@@ -2,12 +2,13 @@
   "name": "prismpulse",
   "productName": "PrismPulse",
   "version": "1.0.0",
-  "description": "Fusion Graphics Engine & Offline Simulator Tuner",
+  "description": "Local-first simulator configuration and preset manager",
   "main": ".vite/build/main.cjs",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "installer": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\install-prismpulse.ps1"
   },
   "keywords": [],
   "author": "viper",

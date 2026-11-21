@@ -1,0 +1,50 @@
+PrismPulse Terms and Conditions
+
+Please read these terms before installing PrismPulse. If you do not agree,
+cancel Setup.
+
+1. What PrismPulse does
+
+PrismPulse is a local simulator profile and preset manager. In this release,
+profile options and visual values are saved as configuration only. PrismPulse
+does not include or activate frame-generation, neural-rendering, shader, or
+other simulator runtime components.
+
+2. Simulator files and backups
+
+When you use PrismPulse, it may create or update PrismPulse-owned files, such
+as PrismPulse.ini and PrismPulseData, in a folder that you explicitly select.
+It may create backups before changing its own configuration files. You are
+responsible for keeping your own backups and checking the selected folder
+before saving or restoring profiles. The PrismPulse installer itself does
+not modify simulator folders.
+
+3. Compatibility and safe use
+
+Compatibility and results are not guaranteed and may vary by simulator,
+hardware, drivers, updates, and other installed software. Basic protection
+checks cannot determine whether a simulator or anti-cheat system permits
+third-party tools. Check the simulator publisher's rules and close the
+simulator before saving or restoring a profile.
+
+4. Third-party software
+
+PrismPulse is not affiliated with or endorsed by Microsoft, Asobo Studio,
+Laminar Research, NVIDIA, AMD, Intel, or any simulator publisher. Their names
+and products belong to their respective owners. Any third-party component
+offered in a future release will be governed by its own license and terms;
+installing PrismPulse does not grant rights to third-party software.
+
+5. Privacy
+
+PrismPulse currently stores profile data on this computer and does not
+automatically upload diagnostics or profile contents.
+
+6. Warranty
+
+PrismPulse is provided "as is," without warranties, to the extent permitted
+by applicable law. You are responsible for deciding whether it is suitable
+for your system.
+
+By selecting "I accept the agreement" and continuing Setup, you acknowledge
+that you have read and agree to these terms.

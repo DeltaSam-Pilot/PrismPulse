@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <defs>
+    <linearGradient id="background" x1="30" y1="24" x2="225" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111520"/>
+      <stop offset="1" stop-color="#0A0D13"/>
+    </linearGradient>
+    <linearGradient id="cyan-mark" x1="48" y1="66" x2="124" y2="190" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9FBFF"/>
+      <stop offset=".48" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <linearGradient id="blue-mark" x1="132" y1="66" x2="208" y2="190" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DBEAFE"/>
+      <stop offset=".48" stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <clipPath id="left-p" clipPathUnits="userSpaceOnUse">
+      <path d="M48 190V66H97L124 91V123L97 148H72V190H48ZM72 92V122H91L108 107L91 92H72Z" clip-rule="evenodd"/>
+    </clipPath>
+    <clipPath id="right-p" clipPathUnits="userSpaceOnUse">
+      <path d="M132 190V66H181L208 91V123L181 148H156V190H132ZM156 92V122H175L192 107L175 92H156Z" clip-rule="evenodd"/>
+    </clipPath>
+    <filter id="mark-glow" x="36" y="52" width="184" height="156" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+  <rect x="14" y="14" width="228" height="228" rx="62" fill="url(#background)"/>
+  <rect x="14.75" y="14.75" width="226.5" height="226.5" rx="61.25" stroke="#262E42" stroke-width="1.5"/>
+  <path d="M48 190V66H97L124 91V123L97 148H72V190H48ZM132 190V66H181L208 91V123L181 148H156V190H132ZM72 92V122H91L108 107L91 92H72ZM156 92V122H175L192 107L175 92H156Z" fill="#22D3EE" fill-opacity=".26" filter="url(#mark-glow)" fill-rule="evenodd"/>
+  <path d="M48 190V66H97L124 91V123L97 148H72V190H48ZM72 92V122H91L108 107L91 92H72Z" fill="url(#cyan-mark)" fill-rule="evenodd"/>
+  <path d="M132 190V66H181L208 91V123L181 148H156V190H132ZM156 92V122H175L192 107L175 92H156Z" fill="url(#blue-mark)" fill-rule="evenodd"/>
+  <g clip-path="url(#left-p)">
+    <path d="M48 66H72V190H48Z" fill="#0EA5E9" fill-opacity=".52"/>
+    <path d="M48 66H97L112 82H72L48 94Z" fill="#D9FBFF" fill-opacity=".72"/>
+    <path d="M97 66L124 91L108 107L91 88H72V82Z" fill="#67E8F9"/>
+    <path d="M108 107L124 91V123L97 148H72V128H91Z" fill="#0EA5E9"/>
+    <path d="M48 94L72 82V190H48Z" fill="#0284C7" fill-opacity=".28"/>
+  </g>
+  <g clip-path="url(#right-p)">
+    <path d="M132 66H156V190H132Z" fill="#2563EB" fill-opacity=".42"/>
+    <path d="M132 66H181L196 82H156L132 94Z" fill="#DBEAFE" fill-opacity=".78"/>
+    <path d="M181 66L208 91L192 107L175 88H156V82Z" fill="#93C5FD"/>
+    <path d="M192 107L208 91V123L181 148H156V128H175Z" fill="#3B82F6"/>
+    <path d="M132 94L156 82V190H132Z" fill="#1D4ED8" fill-opacity=".26"/>
+  </g>
+  <path d="M48 190V66H97L124 91V123L97 148H72V190H48Z" stroke="#D9FBFF" stroke-opacity=".82" stroke-linejoin="bevel" stroke-width="2"/>
+  <path d="M132 190V66H181L208 91V123L181 148H156V190H132Z" stroke="#DBEAFE" stroke-opacity=".84" stroke-linejoin="bevel" stroke-width="2"/>
+  <path d="M72 92V122H91L108 107L91 92H72ZM156 92V122H175L192 107L175 92H156Z" stroke="#075985" stroke-opacity=".58" stroke-linejoin="bevel" stroke-width="1.5"/>
+</svg>

@@ -8,10 +8,16 @@ import type {
   SimDirectoryInfo,
 } from './preload';
 
+declare module '*.svg' {
+  const src: string;
+  export default src;
+}
+
 declare global {
   interface Window {
     prismpulse: {
       autoDetectAllSims: () => Promise<SimDirectoryInfo[]>;
+      inspectTargetFolder: (folderPath: string) => Promise<SimDirectoryInfo | null>;
       selectTargetFolder: () => Promise<SimDirectoryInfo | null>;
       openTargetFolder: (folderPath: string) => Promise<void>;
       importPreset: (folderPath: string) => Promise<ActionResult>;

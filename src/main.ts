@@ -43,7 +43,7 @@ interface InstallPayload {
 interface SimDirectoryInspection {
   name: string;
   path: string;
-  isInstalled: boolean;
+  hasProfile: boolean;
   hasUserCfg: boolean;
   hasAntiCheat: boolean;
   savedPresets: string[];
@@ -103,6 +103,36 @@ function buildPresetIniContent(
   ].join('\r\n');
 }
 
+function writeFileAtomically(filePath: string, contents: string): void {
+  const temporaryPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporaryPath, contents, 'utf-8');
+    fs.renameSync(temporaryPath, filePath);
+  } catch (error: unknown) {
+    if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+    throw error;
+  }
+}
+
+function getSha256(contents: string): string {
+  return crypto.createHash('sha256').update(contents, 'utf-8').digest('hex');
+}
+
+function getLatestBackup(backupDir: string, prefix: string): string | undefined {
+  if (!fs.existsSync(backupDir)) return undefined;
+  const backups = fs
+    .readdirSync(backupDir)
+    .filter((name) => name.startsWith(prefix) && name.endsWith('.bak'))
+    .map((name) => path.join(backupDir, name))
+    .sort(
+      (left, right) =>
+        fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs ||
+        right.localeCompare(left),
+    );
+  const latestBackup = backups[0];
+  return latestBackup;
+}
+
 function parseIniLookValues(
   iniText: string,
   fallback: LookSettings,
@@ -127,17 +157,38 @@ function parseIniLookValues(
   return parsed;
 }
 
-function isSimulatorRunning(): boolean {
-  try {
-    const tasks = execSync('tasklist /FO CSV /NH', {
-      encoding: 'utf-8',
-      windowsHide: true,
-    }).toLowerCase();
+function parseIniComponentValues(iniText: string): ComponentToggles {
+  const parsed: ComponentToggles = {};
+  const keys: Record<string, keyof ComponentToggles> = {
+    CoreRuntime: 'core',
+    OptiMFGFrameGen: 'optimfg',
+    ImageEffectsShaders: 'effects',
+    GlassCockpitDLSSFix: 'glassCockpit',
+    NeuralRendering: 'neuralRender',
+  };
 
-    return SIM_PROCESS_NAMES.some((procName) => tasks.includes(procName));
-  } catch {
-    return false;
+  for (const rawLine of iniText.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const eqIndex = line.indexOf('=');
+    if (eqIndex <= 0) continue;
+
+    const key = keys[line.slice(0, eqIndex).trim()];
+    const value = line.slice(eqIndex + 1).trim();
+    if (key && (value === '0' || value === '1')) {
+      parsed[key] = value === '1';
+    }
   }
+
+  return parsed;
+}
+
+function isSimulatorRunning(): boolean {
+  const tasks = execSync('tasklist /FO CSV /NH', {
+    encoding: 'utf-8',
+    windowsHide: true,
+  }).toLowerCase();
+
+  return SIM_PROCESS_NAMES.some((procName) => tasks.includes(procName));
 }
 
 function getGpuName(): string {
@@ -153,10 +204,14 @@ function getGpuName(): string {
   } catch {
     // Fallback below
   }
-  return 'Standard Windows GPU';
+  return 'GPU detection unavailable';
 }
 
-function inspectDirectory(label: string, dirPath: string): SimDirectoryInspection {
+function inspectDirectory(
+  label: string,
+  dirPath: string,
+  simRunning = isSimulatorRunning(),
+): SimDirectoryInspection {
   const dataDir = path.join(dirPath, 'PrismPulseData');
   const presetsDir = path.join(dataDir, 'Presets');
   const activeIni = path.join(dirPath, 'PrismPulse.ini');
@@ -191,20 +246,23 @@ function inspectDirectory(label: string, dirPath: string): SimDirectoryInspectio
   return {
     name: label,
     path: dirPath,
-    isInstalled: fs.existsSync(dataDir) || fs.existsSync(activeIni),
+    hasProfile: fs.existsSync(dataDir) || fs.existsSync(activeIni),
     hasUserCfg: fs.existsSync(path.join(dirPath, 'UserCfg.opt')),
     hasAntiCheat,
     savedPresets,
-    simRunning: isSimulatorRunning(),
+    simRunning,
   };
 }
 
 function createWindow(): BrowserWindow {
+  const windowIcon = path.join(app.getAppPath(), 'assets', 'icon.ico');
   const mainWindow = new BrowserWindow({
+    title: 'PrismPulse',
     width: 1240,
     height: 800,
     minWidth: 920,
     minHeight: 600,
+    icon: fs.existsSync(windowIcon) ? windowIcon : undefined,
     show: false,
     backgroundColor: '#0a0d13',
     webPreferences: {
@@ -272,6 +330,28 @@ function registerIpcHandlers(): void {
       valid.length > 0 ? valid : candidates.filter((c) => fs.existsSync(c.dir));
 
     return matches.map((m) => inspectDirectory(m.label, m.dir));
+  });
+
+  ipcMain.handle('inspect-target-folder', async (_event, folderPath: unknown) => {
+    if (typeof folderPath !== 'string' || !path.isAbsolute(folderPath)) {
+      return null;
+    }
+
+    const targetPath = path.resolve(folderPath);
+    try {
+      if (!fs.statSync(targetPath).isDirectory()) return null;
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+      ) {
+        return null;
+      }
+      throw error;
+    }
+
+    return inspectDirectory(path.basename(targetPath), targetPath);
   });
 
   ipcMain.handle('select-target-folder', async () => {
@@ -392,6 +472,7 @@ function registerIpcHandlers(): void {
           success: true,
           message: `Loaded look values from ${safePreset}.ini`,
           look: parseIniLookValues(content, defaultLook),
+          components: parseIniComponentValues(content),
         };
       } catch (err: unknown) {
         return {
@@ -434,10 +515,9 @@ function registerIpcHandlers(): void {
           components ?? {},
           safeLook,
         );
-        fs.writeFileSync(
+        writeFileAtomically(
           path.join(presetsDir, `${safePreset}.ini`),
           iniLines,
-          'utf-8',
         );
 
         return {
@@ -468,7 +548,7 @@ function registerIpcHandlers(): void {
         return {
           success: false,
           message:
-            'Simulator is running — close it first before installing components.',
+            'Simulator is running — close it first before saving the profile.',
         };
       }
 
@@ -481,11 +561,18 @@ function registerIpcHandlers(): void {
         fs.mkdirSync(backupDir, { recursive: true });
 
         const activeIniPath = path.join(folderPath, 'PrismPulse.ini');
+        const backupId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${crypto.randomUUID()}`;
         if (fs.existsSync(activeIniPath)) {
-          const stamp = new Date().toISOString().replace(/[:.]/g, '-');
           fs.copyFileSync(
             activeIniPath,
-            path.join(backupDir, `PrismPulse_${stamp}.ini.bak`),
+            path.join(backupDir, `PrismPulse_${backupId}.ini.bak`),
+          );
+        }
+        const manifestPath = path.join(dataDir, 'manifest.json');
+        if (fs.existsSync(manifestPath)) {
+          fs.copyFileSync(
+            manifestPath,
+            path.join(backupDir, `manifest_${backupId}.json.bak`),
           );
         }
 
@@ -501,38 +588,33 @@ function registerIpcHandlers(): void {
 
         const iniLines = buildPresetIniContent(safePreset, components, look);
 
-        fs.writeFileSync(activeIniPath, iniLines, 'utf-8');
-        fs.writeFileSync(
-          path.join(presetsDir, `${safePreset}.ini`),
-          iniLines,
-          'utf-8',
-        );
-
-        const sha256 = crypto
-          .createHash('sha256')
-          .update(iniLines)
-          .digest('hex');
-
-        fs.writeFileSync(
-          path.join(dataDir, 'manifest.json'),
+        const sha256 = getSha256(iniLines);
+        writeFileAtomically(activeIniPath, iniLines);
+        writeFileAtomically(path.join(presetsDir, `${safePreset}.ini`), iniLines);
+        writeFileAtomically(
+          manifestPath,
           JSON.stringify(
             {
               installedAt: new Date().toISOString(),
               presetName: safePreset,
               components,
               look,
-              sha256,
+              activeConfigSha256: sha256,
+              configurationOnly: true,
             },
             null,
             2,
           ),
-          'utf-8',
         );
+
+        if (getSha256(fs.readFileSync(activeIniPath, 'utf-8')) !== sha256) {
+          throw new Error('Configuration integrity check failed after writing.');
+        }
 
         return {
           success: true,
-          message: `Installed "${safePreset}" & verified SHA-256 (${sha256.slice(0, 12)}...)`,
-          updatedState: inspectDirectory(path.basename(folderPath), folderPath),
+          message: `Saved "${safePreset}" configuration and verified its SHA-256. Runtime components are not included or installed by PrismPulse.`,
+          updatedState: inspectDirectory(path.basename(folderPath), folderPath, false),
         };
       } catch (err: unknown) {
         const message =
@@ -562,18 +644,28 @@ function registerIpcHandlers(): void {
       try {
         const activeIniPath = path.join(folderPath, 'PrismPulse.ini');
         const dataDir = path.join(folderPath, 'PrismPulseData');
+        const backupDir = path.join(dataDir, 'Backups');
+        const previousIni = getLatestBackup(backupDir, 'PrismPulse_');
 
-        if (fs.existsSync(activeIniPath)) {
+        if (previousIni) {
+          writeFileAtomically(activeIniPath, fs.readFileSync(previousIni, 'utf-8'));
+        } else if (fs.existsSync(activeIniPath)) {
           fs.unlinkSync(activeIniPath);
         }
 
         if (fs.existsSync(dataDir)) {
-          if (keepPresets) {
-            const manifestPath = path.join(dataDir, 'manifest.json');
-            if (fs.existsSync(manifestPath)) {
-              fs.unlinkSync(manifestPath);
-            }
-          } else {
+          const manifestPath = path.join(dataDir, 'manifest.json');
+          const previousManifest = getLatestBackup(backupDir, 'manifest_');
+          if (previousManifest) {
+            writeFileAtomically(
+              manifestPath,
+              fs.readFileSync(previousManifest, 'utf-8'),
+            );
+          } else if (fs.existsSync(manifestPath)) {
+            fs.unlinkSync(manifestPath);
+          }
+
+          if (!keepPresets) {
             fs.rmSync(dataDir, { recursive: true, force: true });
           }
         }
@@ -581,9 +673,9 @@ function registerIpcHandlers(): void {
         return {
           success: true,
           message: keepPresets
-            ? 'Restored original files (kept saved INI presets in PrismPulseData/Presets).'
-            : 'Restored original files & removed all PrismPulse components.',
-          updatedState: inspectDirectory(path.basename(folderPath), folderPath),
+            ? 'Restored the previous configuration and kept saved presets.'
+            : 'Restored the previous configuration and removed PrismPulse data.',
+          updatedState: inspectDirectory(path.basename(folderPath), folderPath, false),
         };
       } catch (err: unknown) {
         const message =
@@ -598,15 +690,44 @@ function registerIpcHandlers(): void {
     const totalRamGB = (os.totalmem() / 1024 ** 3).toFixed(1);
     const gpu = getGpuName();
 
-    let manifestInfo = 'Not installed in selected folder';
+    let manifestInfo = 'No PrismPulse configuration found in selected folder.';
+    let integrityStatus = 'Not installed';
     if (folderPath) {
-      const manifestPath = path.join(
-        folderPath,
-        'PrismPulseData',
-        'manifest.json',
-      );
+      const activeIniPath = path.join(folderPath, 'PrismPulse.ini');
+      const manifestPath = path.join(folderPath, 'PrismPulseData', 'manifest.json');
       if (fs.existsSync(manifestPath)) {
-        manifestInfo = fs.readFileSync(manifestPath, 'utf-8');
+        try {
+          const manifestText = fs.readFileSync(manifestPath, 'utf-8');
+          const manifest = JSON.parse(manifestText) as {
+            activeConfigSha256?: unknown;
+            sha256?: unknown;
+          };
+          manifestInfo = manifestText;
+          const expectedHash =
+            typeof manifest.activeConfigSha256 === 'string'
+              ? manifest.activeConfigSha256
+              : manifest.sha256;
+          if (
+            fs.existsSync(activeIniPath) &&
+            typeof expectedHash === 'string'
+          ) {
+            integrityStatus =
+              getSha256(fs.readFileSync(activeIniPath, 'utf-8')) ===
+              expectedHash
+                ? 'Configuration hash verified'
+                : 'Configuration hash mismatch';
+          } else {
+            integrityStatus = 'Configuration or integrity hash missing';
+          }
+        } catch (error: unknown) {
+          manifestInfo =
+            error instanceof Error
+              ? `Manifest unreadable: ${error.message}`
+              : 'Manifest unreadable.';
+          integrityStatus = 'Could not verify configuration';
+        }
+      } else if (fs.existsSync(activeIniPath)) {
+        integrityStatus = 'Configuration exists without a manifest';
       }
     }
 
@@ -615,6 +736,7 @@ function registerIpcHandlers(): void {
       ram: `${totalRamGB} GB`,
       gpu,
       simRunning: isSimulatorRunning(),
+      integrityStatus,
       manifestInfo,
     };
   });
@@ -631,6 +753,7 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
+  app.setName('PrismPulse');
   registerIpcHandlers();
   createWindow();
 

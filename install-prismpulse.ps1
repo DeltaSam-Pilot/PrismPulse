@@ -1,11 +1,21 @@
-﻿Add-Type -AssemblyName System.Windows.Forms
+[CmdletBinding()]
+param(
+    [switch]$Uninstall,
+    [string]$TargetDirectory
+)
+
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $AppName = "PrismPulse"
 $Version = "1.0.0"
-$ExeName = "PrismPulseApp.exe"
-$DefaultSource = Join-Path $PSScriptRoot "out\PrismPulseApp-win32-x64"
-$DefaultTarget = Join-Path $env:LOCALAPPDATA $AppName
+$ExeName = "PrismPulse.exe"
+$DefaultSource = Join-Path $PSScriptRoot "out\PrismPulse-win32-x64"
+$DefaultTarget = if (-not [string]::IsNullOrWhiteSpace($TargetDirectory)) {
+    $TargetDirectory
+} else {
+    Join-Path $env:LOCALAPPDATA $AppName
+}
 $UserDataDir = Join-Path $env:APPDATA $AppName
 
 function Resolve-BuildSource([string]$PreferredPath, [string]$ExeFileName) {
@@ -15,7 +25,7 @@ function Resolve-BuildSource([string]$PreferredPath, [string]$ExeFileName) {
     $altBuild = Get-ChildItem -Path $PSScriptRoot -Directory -Filter "out_build_*" -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending |
         ForEach-Object {
-            $candidate = Join-Path $_.FullName "PrismPulseApp-win32-x64"
+            $candidate = Join-Path $_.FullName "PrismPulse-win32-x64"
             if (Test-Path (Join-Path $candidate $ExeFileName)) { $candidate }
         } | Select-Object -First 1
     if ($altBuild) {
@@ -26,7 +36,7 @@ function Resolve-BuildSource([string]$PreferredPath, [string]$ExeFileName) {
 
 $SourceDir = Resolve-BuildSource -PreferredPath $DefaultSource -ExeFileName $ExeName
 $sourceExe = Join-Path $SourceDir $ExeName
-if (-not (Test-Path $sourceExe)) {
+if (-not $Uninstall -and -not (Test-Path $sourceExe)) {
     [System.Windows.Forms.MessageBox]::Show(
         "Packaged build not found at:`n$sourceExe`n`nRun 'npm run make' first.",
         "$AppName Installer",
@@ -408,6 +418,24 @@ function New-AppShortcut([string]$ShortcutPath, [string]$TargetExe, [string]$Wor
     $lnk.Save()
 }
 
+function Register-Application([string]$TargetDir, [string]$InstalledExe) {
+    $uninstallScript = Join-Path $TargetDir "PrismPulse-Uninstaller.ps1"
+    Copy-Item -LiteralPath $PSCommandPath -Destination $uninstallScript -Force
+    $uninstallString = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$uninstallScript`" -Uninstall -TargetDirectory `"$TargetDir`""
+    $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PrismPulse"
+    New-Item -Path $registryPath -Force | Out-Null
+    Set-ItemProperty -Path $registryPath -Name "DisplayName" -Value $AppName
+    Set-ItemProperty -Path $registryPath -Name "DisplayVersion" -Value $Version
+    Set-ItemProperty -Path $registryPath -Name "Publisher" -Value "viper"
+    Set-ItemProperty -Path $registryPath -Name "InstallLocation" -Value $TargetDir
+    Set-ItemProperty -Path $registryPath -Name "DisplayIcon" -Value $InstalledExe
+    Set-ItemProperty -Path $registryPath -Name "UninstallString" -Value $uninstallString
+    Set-ItemProperty -Path $registryPath -Name "QuietUninstallString" -Value $uninstallString
+    Set-ItemProperty -Path $registryPath -Name "NoModify" -Value 1 -Type DWord
+    Set-ItemProperty -Path $registryPath -Name "NoRepair" -Value 0 -Type DWord
+    Set-ItemProperty -Path $registryPath -Name "EstimatedSize" -Value ([Math]::Ceiling($totalBytes / 1KB)) -Type DWord
+}
+
 function Test-DriveSpace([string]$TargetPath, [long]$RequiredBytes) {
     $root = [System.IO.Path]::GetPathRoot($TargetPath)
     if ([string]::IsNullOrWhiteSpace($root)) { return $true }
@@ -580,6 +608,17 @@ $runInstall = {
         New-AppShortcut -ShortcutPath $startMenuLnk -TargetExe $installedExe -WorkingDir $targetDir -IconFile $iconPath
     }
 
+    if (-not (Test-Path $installedExe)) {
+        Write-InstallLog -TargetDir $targetDir -Message "ERROR: Installed executable not found at $installedExe"
+        $statusLabel.Text = "Copy completed but $ExeName was not found."
+        $installBtn.Enabled = $true
+        $browseBtn.Enabled = $true
+        $dirBox.Enabled = $true
+        & $updateUIState
+        return
+    }
+    Register-Application -TargetDir $targetDir -InstalledExe $installedExe
+
     Write-InstallLog -TargetDir $targetDir -Message "Completed successfully ($copied files)."
     Set-ProgressUI -Value $sourceFiles.Count -Maximum $sourceFiles.Count
     $browseBtn.Enabled = $true
@@ -655,6 +694,10 @@ $uninstallBtn.Add_Click({
     }
     if ($deleteUserData -and (Test-Path $UserDataDir)) {
         Remove-Item -Path $UserDataDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PrismPulse"
+    if (Test-Path $registryPath) {
+        Remove-Item -Path $registryPath -Recurse -Force
     }
 
     Set-ProgressUI -Value 100 -Maximum 100

@@ -9,15 +9,15 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    name: 'PrismPulseApp',
-    executableName: 'PrismPulseApp',
+    name: 'PrismPulse',
+    executableName: 'PrismPulse',
     asar: true,
     icon: './assets/icon.ico',
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      name: 'PrismPulseApp',
+      name: 'PrismPulse',
       setupIcon: './assets/icon.ico',
     }),
     new MakerZIP({}, ['darwin']),
