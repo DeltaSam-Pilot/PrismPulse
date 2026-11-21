@@ -1,0 +1,42 @@
+﻿name: Build Windows App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package application
+        run: npm run make
+
+      - name: Verify packaged executable
+        shell: pwsh
+        run: |
+          $exe = "out\PrismPulseApp-win32-x64\PrismPulseApp.exe"
+          if (-not (Test-Path $exe)) {
+            throw "Expected build output not found at $exe"
+          }
+
+      - name: Upload packaged build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrismPulseApp-win32-x64
+          path: out/PrismPulseApp-win32-x64
+          if-no-files-found: error
