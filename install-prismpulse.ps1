@@ -2,13 +2,16 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $AppName = "PrismPulse"
+$Version = "1.0.0"
 $ExeName = "PrismPulseApp.exe"
 $SourceDir = Join-Path $PSScriptRoot "out\PrismPulseApp-win32-x64"
 $DefaultTarget = Join-Path $env:LOCALAPPDATA $AppName
+$UserDataDir = Join-Path $env:APPDATA $AppName
 
-if (-not (Test-Path (Join-Path $SourceDir $ExeName))) {
+$sourceExe = Join-Path $SourceDir $ExeName
+if (-not (Test-Path $sourceExe)) {
     [System.Windows.Forms.MessageBox]::Show(
-        "Packaged build not found at:`n$SourceDir\$ExeName`n`nRun 'npm run make' first.",
+        "Packaged build not found at:`n$sourceExe`n`nRun 'npm run make' first.",
         "$AppName Installer",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Error
@@ -16,250 +19,153 @@ if (-not (Test-Path (Join-Path $SourceDir $ExeName))) {
     exit 1
 }
 
-$form = New-Object System.Windows.Forms.Form
-$form.Text = "$AppName Custom Installer"
-$form.Size = New-Object System.Drawing.Size(540, 320)
-$form.StartPosition = "CenterScreen"
-$form.FormBorderStyle = "None"
-$form.BackColor = [System.Drawing.Color]::FromArgb(15, 23, 42)
-$form.ForeColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
+$sourceFiles = Get-ChildItem -Path$SourceDir -Recurse -File
+$totalBytes = ($sourceFiles | Measure-Object -Property Length -Sum).Sum
+if (-not $totalBytes) {$totalBytes = 0 }
+$totalMB = [Math]::Round(($totalBytes / 1MB), 1)
 
-$iconPath = Join-Path $PSScriptRoot "assets\icon.ico"
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "$AppName Installer"
+$form.Size = New-Object System.Drawing.Size(620, 445)$form.StartPosition = "CenterScreen"
+$form.FormBorderStyle = "None"
+$form.BackColor = [System.Drawing.Color]::FromArgb(11, 16, 29)$form.ForeColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
+
+$iconPath = Join-Path$PSScriptRoot "assets\icon.ico"
 if (Test-Path $iconPath) {
     $form.Icon = New-Object System.Drawing.Icon($iconPath)
 }
 
-# Custom top bar
+# Rounded window region
+$path = New-Object System.Drawing.Drawing2D.GraphicsPath
+$radius = 18
+$rect = New-Object System.Drawing.Rectangle(0, 0,$form.Width, $form.Height)$d = $radius * 2$path.AddArc($rect.X, $rect.Y, $d,$d, 180, 90)
+$path.AddArc($rect.Right - $d,$rect.Y, $d,$d, 270, 90)
+$path.AddArc($rect.Right - $d,$rect.Bottom - $d,$d, $d, 0, 90)$path.AddArc($rect.X, $rect.Bottom - $d,$d, $d, 90, 90)$path.CloseFigure()
+$form.Region = New-Object System.Drawing.Region($path)
+
+$form.Add_Paint({
+    param($sender, $e)$pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(34, 211, 238), 1.5)
+    $e.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias$e.Graphics.DrawRectangle($pen, 1, 1, ($form.Width - 2), ($form.Height - 2))$pen.Dispose()
+})
+
+# Top Header Bar
 $topBar = New-Object System.Windows.Forms.Panel
-$topBar.Size = New-Object System.Drawing.Size(540, 42)
-$topBar.Location = New-Object System.Drawing.Point(0, 0)
-$topBar.BackColor = [System.Drawing.Color]::FromArgb(10, 15, 28)
+$topBar.Size = New-Object System.Drawing.Size(620, 58)
+$topBar.Location = New-Object System.Drawing.Point(0, 0)$topBar.BackColor = [System.Drawing.Color]::FromArgb(8, 12, 22)
 $form.Controls.Add($topBar)
+
+if (Test-Path $iconPath) {$logoBox = New-Object System.Windows.Forms.PictureBox
+    $logoBox.Size = New-Object System.Drawing.Size(28, 28)
+    $logoBox.Location = New-Object System.Drawing.Point(20, 15)$logoBox.SizeMode = "Zoom"
+    $logoBox.Image = ([System.Drawing.Icon]::new($iconPath)).ToBitmap()
+    $topBar.Controls.Add($logoBox)
+}
 
 $titleLabel = New-Object System.Windows.Forms.Label
 $titleLabel.Text = "$AppName Setup"
-$titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
-$titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(34, 211, 238)
-$titleLabel.Location = New-Object System.Drawing.Point(16, 10)
-$titleLabel.AutoSize = $true
+$titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold)
+$titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(34, 211, 238)$titleLabel.Location = New-Object System.Drawing.Point(56, 15)
+$titleLabel.AutoSize =$true
 $topBar.Controls.Add($titleLabel)
 
+$verBadge = New-Object System.Drawing.Label
+$verBadge.Text = "v$Version  •  $totalMB MB ($($sourceFiles.Count) files)"
+$verBadge.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$verBadge.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)$verBadge.Location = New-Object System.Drawing.Point(180, 19)
+$verBadge.AutoSize =$true
+$topBar.Controls.Add($verBadge)
+
 $closeBtn = New-Object System.Windows.Forms.Button
-$closeBtn.Text = "X"
-$closeBtn.Size = New-Object System.Drawing.Size(34, 28)
-$closeBtn.Location = New-Object System.Drawing.Point(494, 7)
-$closeBtn.FlatStyle = "Flat"
-$closeBtn.ForeColor = [System.Drawing.Color]::White
-$closeBtn.BackColor = [System.Drawing.Color]::FromArgb(30, 41, 59)
-$closeBtn.FlatAppearance.BorderSize = 0
-$closeBtn.Add_Click({ $form.Close() })
+$closeBtn.Text = "✕"
+$closeBtn.Size = New-Object System.Drawing.Size(34, 30)
+$closeBtn.Location = New-Object System.Drawing.Point(568, 14)$closeBtn.FlatStyle = "Flat"
+$closeBtn.ForeColor = [System.Drawing.Color]::FromArgb(203, 213, 225)
+$closeBtn.BackColor = [System.Drawing.Color]::FromArgb(30, 41, 59)$closeBtn.FlatAppearance.BorderSize = 0
+$closeBtn.Add_MouseEnter({$closeBtn.BackColor = [System.Drawing.Color]::FromArgb(185, 28, 28); $closeBtn.ForeColor = [System.Drawing.Color]::White })$closeBtn.Add_MouseLeave({ $closeBtn.BackColor = [System.Drawing.Color]::FromArgb(30, 41, 59);$closeBtn.ForeColor = [System.Drawing.Color]::FromArgb(203, 213, 225) })
+$closeBtn.Add_Click({$form.Close() })
 $topBar.Controls.Add($closeBtn)
 
-# Drag window by top bar
-$script:dragging = $false
-$script:dragOffset = [System.Drawing.Point]::Empty
-$topBar.Add_MouseDown({
-    if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-        $script:dragging = $true
-        $script:dragOffset = New-Object System.Drawing.Point($_.X, $_.Y)
+# Drag window
+$script:dragging =$false
+$script:dragOffset = [System.Drawing.Point]::Empty$onMouseDown = {
+    if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {$script:dragging = $true$script:dragOffset = New-Object System.Drawing.Point($_.X, $_.Y)
     }
-})
-$topBar.Add_MouseMove({
-    if ($script:dragging) {
-        $form.Location = New-Object System.Drawing.Point(
-            ($form.Location.X + $_.X - $script:dragOffset.X),
-            ($form.Location.Y + $_.Y - $script:dragOffset.Y)
+}
+$onMouseMove = {
+    if ($script:dragging) {$form.Location = New-Object System.Drawing.Point(
+            ($form.Location.X + $_.X -$script:dragOffset.X),
+            ($form.Location.Y + $_.Y -$script:dragOffset.Y)
         )
     }
-})
-$topBar.Add_MouseUp({ $script:dragging = $false })
+}
+$onMouseUp = { $script:dragging =$false }
 
-# Path selection
+foreach ($ctrl in @($topBar, $titleLabel,$verBadge)) {
+    $ctrl.Add_MouseDown($onMouseDown)
+    $ctrl.Add_MouseMove($onMouseMove)
+    $ctrl.Add_MouseUp($onMouseUp)
+}
+
+# Main Card Panel
+$card = New-Object System.Windows.Forms.Panel
+$card.Size = New-Object System.Drawing.Size(572, 168)
+$card.Location = New-Object System.Drawing.Point(24, 76)$card.BackColor = [System.Drawing.Color]::FromArgb(18, 26, 46)
+$form.Controls.Add($card)
+
 $dirLabel = New-Object System.Windows.Forms.Label
-$dirLabel.Text = "Install Folder:"
-$dirLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
-$dirLabel.Location = New-Object System.Drawing.Point(24, 68)
-$dirLabel.AutoSize = $true
-$form.Controls.Add($dirLabel)
+$dirLabel.Text = "Installation Directory"
+$dirLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$dirLabel.Location = New-Object System.Drawing.Point(16, 14)
+$dirLabel.AutoSize =$true
+$card.Controls.Add($dirLabel)
 
 $dirBox = New-Object System.Windows.Forms.TextBox
-$dirBox.Text = $DefaultTarget
-$dirBox.Size = New-Object System.Drawing.Size(385, 26)
-$dirBox.Location = New-Object System.Drawing.Point(24, 92)
+$dirBox.Text = $DefaultTarget$dirBox.Size = New-Object System.Drawing.Size(428, 28)
+$dirBox.Location = New-Object System.Drawing.Point(16, 40)$dirBox.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
 $dirBox.BackColor = [System.Drawing.Color]::FromArgb(30, 41, 59)
-$dirBox.ForeColor = [System.Drawing.Color]::White
-$dirBox.BorderStyle = "FixedSingle"
-$form.Controls.Add($dirBox)
+$dirBox.ForeColor = [System.Drawing.Color]::White$dirBox.BorderStyle = "FixedSingle"
+$card.Controls.Add($dirBox)
 
 $browseBtn = New-Object System.Windows.Forms.Button
-$browseBtn.Text = "Browse"
-$browseBtn.Size = New-Object System.Drawing.Size(96, 26)
-$browseBtn.Location = New-Object System.Drawing.Point(418, 92)
-$browseBtn.FlatStyle = "Flat"
+$browseBtn.Text = "Browse..."
+$browseBtn.Size = New-Object System.Drawing.Size(100, 28)
+$browseBtn.Location = New-Object System.Drawing.Point(454, 40)$browseBtn.FlatStyle = "Flat"
 $browseBtn.BackColor = [System.Drawing.Color]::FromArgb(51, 65, 85)
-$browseBtn.ForeColor = [System.Drawing.Color]::White
+$browseBtn.ForeColor = [System.Drawing.Color]::White$browseBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $browseBtn.FlatAppearance.BorderSize = 0
-$browseBtn.Add_Click({
-    $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dlg.SelectedPath = $dirBox.Text
+$browseBtn.Add_MouseEnter({$browseBtn.BackColor = [System.Drawing.Color]::FromArgb(71, 85, 105) })
+$browseBtn.Add_MouseLeave({$browseBtn.BackColor = [System.Drawing.Color]::FromArgb(51, 65, 85) })
+$browseBtn.Add_Click({$dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dlg.SelectedPath =$dirBox.Text
     if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $dirBox.Text = Join-Path $dlg.SelectedPath $AppName
-    }
-})
-$form.Controls.Add($browseBtn)
-
-$shortcutChk = New-Object System.Windows.Forms.CheckBox
-$shortcutChk.Text = "Create Desktop shortcut"
-$shortcutChk.Checked = $true
-$shortcutChk.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
-$shortcutChk.Location = New-Object System.Drawing.Point(24, 134)
-$shortcutChk.AutoSize = $true
-$form.Controls.Add($shortcutChk)
-
-$progressBar = New-Object System.Windows.Forms.ProgressBar
-$progressBar.Location = New-Object System.Drawing.Point(24, 180)
-$progressBar.Size = New-Object System.Drawing.Size(490, 22)
-$progressBar.Style = "Continuous"
-$form.Controls.Add($progressBar)
-
-$statusLabel = New-Object System.Windows.Forms.Label
-$statusLabel.Text = "Ready to install $AppName."
-$statusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-$statusLabel.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
-$statusLabel.Location = New-Object System.Drawing.Point(24, 210)
-$statusLabel.Size = New-Object System.Drawing.Size(490, 22)
-$form.Controls.Add($statusLabel)
-
-$uninstallBtn = New-Object System.Windows.Forms.Button
-$uninstallBtn.Text = "Uninstall"
-$uninstallBtn.Size = New-Object System.Drawing.Size(120, 38)
-$uninstallBtn.Location = New-Object System.Drawing.Point(244, 255)
-$uninstallBtn.FlatStyle = "Flat"
-$uninstallBtn.BackColor = [System.Drawing.Color]::FromArgb(127, 29, 29)
-$uninstallBtn.ForeColor = [System.Drawing.Color]::White
-$uninstallBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
-$uninstallBtn.FlatAppearance.BorderSize = 0
-$form.Controls.Add($uninstallBtn)
-
-$installBtn = New-Object System.Windows.Forms.Button
-$installBtn.Text = "Install Now"
-$installBtn.Size = New-Object System.Drawing.Size(140, 38)
-$installBtn.Location = New-Object System.Drawing.Point(374, 255)
-$installBtn.FlatStyle = "Flat"
-$installBtn.BackColor = [System.Drawing.Color]::FromArgb(6, 182, 212)
-$installBtn.ForeColor = [System.Drawing.Color]::FromArgb(15, 23, 42)
-$installBtn.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$installBtn.FlatAppearance.BorderSize = 0
-$form.Controls.Add($installBtn)
-
-$updateUninstallState = {
-    $target = $dirBox.Text.Trim()
-    $existingExe = if ([string]::IsNullOrWhiteSpace($target)) { $null } else { Join-Path $target $ExeName }
-    $uninstallBtn.Enabled = ($existingExe -and (Test-Path $existingExe))
-}
-$dirBox.Add_TextChanged($updateUninstallState)
-& $updateUninstallState
-
-$uninstallBtn.Add_Click({
-    $targetDir = $dirBox.Text.Trim()
-    if ([string]::IsNullOrWhiteSpace($targetDir) -or (-not (Test-Path $targetDir))) {
-        [System.Windows.Forms.MessageBox]::Show("Installation folder not found.", "$AppName Uninstaller") | Out-Null
-        return
-    }
-
-    $confirm = [System.Windows.Forms.MessageBox]::Show(
-        "Remove $AppName from:`n$targetDir",
-        "Confirm Uninstall",
-        [System.Windows.Forms.MessageBoxButtons]::YesNo,
-        [System.Windows.Forms.MessageBoxIcon]::Warning
-    )
-    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) {
-        return
-    }
-
-    $installBtn.Enabled = $false
-    $uninstallBtn.Enabled = $false
-    $statusLabel.Text = "Uninstalling $AppName..."
-    $progressBar.Value = 0
-    [System.Windows.Forms.Application]::DoEvents()
-
-    Get-Process -Name ([System.IO.Path]::GetFileNameWithoutExtension($ExeName)) -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-
-    $lnkPath = Join-Path ([Environment]::GetFolderPath("Desktop")) "$AppName.lnk"
-    if (Test-Path $lnkPath) {
-        Remove-Item -Path $lnkPath -Force -ErrorAction SilentlyContinue
-    }
-
-    if (Test-Path $targetDir) {
-        Remove-Item -Path $targetDir -Recurse -Force
-    }
-
-    $progressBar.Value = $progressBar.Maximum
-    $statusLabel.Text = "Uninstalled $AppName."
-    $installBtn.Text = "Install Now"
-    $installBtn.Tag = $null
-    $installBtn.Enabled = $true
-    & $updateUninstallState
-})
-
-$installBtn.Add_Click({
-    if ($installBtn.Tag -and (Test-Path $installBtn.Tag)) {
-        Start-Process -FilePath $installBtn.Tag
-        $form.Close()
-        return
-    }
-
-    $targetDir = $dirBox.Text.Trim()
-    if ([string]::IsNullOrWhiteSpace($targetDir)) {
-        [System.Windows.Forms.MessageBox]::Show("Choose a valid installation folder.", "$AppName Installer") | Out-Null
-        return
-    }
-
-    $installBtn.Enabled = $false
-    $uninstallBtn.Enabled = $false
-    $statusLabel.Text = "Copying files..."
-    [System.Windows.Forms.Application]::DoEvents()
-
-    if (-not (Test-Path $targetDir)) {
-        New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
-    }
-
-    $files = Get-ChildItem -Path $SourceDir -Recurse -File
-    $progressBar.Minimum = 0
-    $progressBar.Maximum = [Math]::Max($files.Count, 1)
-    $progressBar.Value = 0
-
-    foreach ($file in $files) {
-        $relPath = $file.FullName.Substring($SourceDir.Length).TrimStart('\')
-        $destFile = Join-Path $targetDir $relPath
-        $destFolder = Split-Path -Path $destFile -Parent
-        if (-not (Test-Path $destFolder)) {
-            New-Item -Path $destFolder -ItemType Directory -Force | Out-Null
+        $chosen =$dlg.SelectedPath
+        if ((Split-Path $chosen -Leaf) -ne $AppName) {$chosen = Join-Path $chosen$AppName
         }
-        Copy-Item -Path $file.FullName -Destination $destFile -Force
-        $progressBar.Value = [Math]::Min($progressBar.Value + 1, $progressBar.Maximum)
-        if (($progressBar.Value % 15) -eq 0) {
-            [System.Windows.Forms.Application]::DoEvents()
-        }
+        $dirBox.Text =$chosen
     }
-
-    $installedExe = Join-Path $targetDir $ExeName
-    if ($shortcutChk.Checked) {
-        $wsh = New-Object -ComObject WScript.Shell
-        $lnkPath = Join-Path ([Environment]::GetFolderPath("Desktop")) "$AppName.lnk"
-        $lnk = $wsh.CreateShortcut($lnkPath)
-        $lnk.TargetPath = $installedExe
-        $lnk.WorkingDirectory = $targetDir
-        if (Test-Path $iconPath) { $lnk.IconLocation = $iconPath }
-        $lnk.Save()
-    }
-
-    $progressBar.Value = $progressBar.Maximum
-    $statusLabel.Text = "Installed to $targetDir"
-    $installBtn.Text = "Launch $AppName"
-    $installBtn.Enabled = $true
-    $installBtn.Tag = $installedExe
-    & $updateUninstallState
 })
+$card.Controls.Add($browseBtn)
 
-[System.Windows.Forms.Application]::Run($form) | Out-Null
+$spaceLabel = New-Object System.Windows.Forms.Label
+$spaceLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8.5)
+$spaceLabel.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
+$spaceLabel.Location = New-Object System.Drawing.Point(16, 74)$spaceLabel.Size = New-Object System.Drawing.Size(540, 18)
+$card.Controls.Add($spaceLabel)
+
+$desktopChk = New-Object System.Windows.Forms.CheckBox
+$desktopChk.Text = "Create Desktop shortcut"
+$desktopChk.Checked = $true$desktopChk.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
+$desktopChk.Location = New-Object System.Drawing.Point(16, 102)
+$desktopChk.AutoSize =$true
+$card.Controls.Add($desktopChk)
+
+$startMenuChk = New-Object System.Windows.Forms.CheckBox
+$startMenuChk.Text = "Add Start Menu shortcut"
+$startMenuChk.Checked = $true$startMenuChk.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
+$startMenuChk.Location = New-Object System.Drawing.Point(225, 102)
+$startMenuChk.AutoSize =$true
+$card.Controls.Add($startMenuChk)
+
+$launchChk = New-Object System.Windows.Forms.CheckBox
+$launchChk.Text = "Launch after install"
+$launchChk.Checked = $true$launchChk.Font = New-Object System.Drawing.Font("Segoe
