@@ -8,7 +8,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $AppName = "PrismPulse"
-$Version = "1.0.1"
+$Version = "1.0.2"
 $ExeName = "PrismPulse.exe"
 $DefaultSource = Join-Path $PSScriptRoot "out\PrismPulse-win32-x64"
 $DefaultTarget = if (-not [string]::IsNullOrWhiteSpace($TargetDirectory)) {

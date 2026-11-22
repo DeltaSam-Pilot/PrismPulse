@@ -1,5 +1,5 @@
 #define MyAppName "PrismPulse"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "viper"
 #define MyAppIconFile "assets\icon.ico"
 #define MyAppTermsFile "TERMS.txt"
